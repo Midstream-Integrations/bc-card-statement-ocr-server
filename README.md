@@ -59,7 +59,7 @@ The full walk-through, covering the server, Microsoft Entra, Business Central an
 ## Need help with this?
 
 [Midstream Integrations](https://www.MidstreamIntegrations.com) hosts this server for you, installs and configures it, adds parsers for your card issuer, and supports it.
-**[Book a 20-minute call](https://midstreamintegrations.com/book)** · intro@MidstreamIntegrations.com
+**[Book a 20-minute call](https://midstreamintegrations.com/contact)** · intro@MidstreamIntegrations.com
 
 ## Contributing
 
