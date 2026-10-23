@@ -24,9 +24,10 @@ This guide sets up the whole solution: the **Business Central extension** ([bc-c
 |---|---|
 | Business Central | Online, version 25 or later, and a sandbox to test in |
 | Microsoft Entra ID | An admin who can register apps and grant admin consent |
+| Exchange Online | An Exchange administrator, once, to let the app send email as the approvals mailbox (6.3) |
 | Server | Ubuntu 24.04 LTS (comes with Python 3.12), or Debian 13 (see [5.1](#51-debian-13-trixie)). Suggested: 2 vCPU and 4 GB RAM; OCR of scanned statements is CPU-heavy. About 10 GB of disk plus room for receipts |
 | Host name | A DNS name for the server, for example `ocr.example.com`, reachable from the internet over HTTPS (Business Central Online calls it from Microsoft's cloud, and managers open the portal from anywhere) |
-| Mailbox | One mailbox the server sends approval emails from, for example `approvals@example.com` |
+| Mailbox | One Microsoft 365 mailbox the server sends approval emails from, for example `approvals@example.com`. A shared mailbox works and needs no license |
 | Requisition Form | A BC report that prints your requisition form (see [11.3](#113-requisition-form-requirements)) |
 
 You will collect these values along the way. Keep them somewhere safe:
@@ -35,6 +36,8 @@ You will collect these values along the way. Keep them somewhere safe:
 |---|---|---|
 | Tenant ID | Entra admin center → Overview | `ocr.env`, `secrets.toml` |
 | Client ID and client secret | Entra app registration (step 3) | `ocr.env`, `secrets.toml`, BC Entra Applications |
+| Enterprise application Object ID | Entra admin center → Enterprise applications → the app (6.3) | Exchange PowerShell (6.3) |
+| Approvals mailbox address | Your Microsoft 365 admin | `ocr.env` (`MAIL_FROM`) |
 | BC environment name | BC admin center (`Production`, or your sandbox name) | `ocr.env` |
 | API key | You generate it (step 6) | `ocr.env`, BC Endpoint API Setup |
 | Company ID | Step 6.4 | `ocr.env` |
@@ -46,13 +49,13 @@ You will collect these values along the way. Keep them somewhere safe:
 1. Download the `.app` from the latest release of [bc-card-statement-ocr](https://github.com/Midstream-Integrations/bc-card-statement-ocr/releases) (or build it from source; see that repo's README).
 2. In BC: **Extension Management** → **Manage** → **Upload Extension** → select the file → **Deploy**.
 3. **Sandbox only:** open **Extension Management**, select the extension, choose **Configure**, and turn on **Allow HttpClient Requests**. (Production allows outgoing calls by default.)
-4. **Email:** the Card Statement OCR action sends the manager's link from BC. Make sure **Email Accounts** has a default account that can send.
+4. **Email:** the Card Statement OCR action sends the manager's link from BC. Make sure **Email Accounts** has a default account that can send. Use the **Microsoft 365** or **Current User** connector, or **SMTP** with **OAuth 2.0**, not SMTP with a password (see [6.3](#63-email)).
 
 ---
 
 ## 3. Microsoft Entra: register the app
 
-One app does two jobs: the server uses it to call the Business Central API, and the portal uses it to sign people in.
+One app does three jobs: the server uses it to call the Business Central API and to send approval emails through Microsoft Graph, and the portal uses it to sign people in.
 
 1. **Entra admin center** → **App registrations** → **New registration**.
    - Name: `Card Statement OCR`
@@ -63,6 +66,7 @@ One app does two jobs: the server uses it to call the Business Central API, and 
 3. **Certificates & secrets** → **New client secret**. Copy the **Value** now; it isn't shown again. Note the expiry date and put a reminder in your calendar: when it expires, sign-in and the BC write-back both stop.
 4. **API permissions** → **Add a permission** → **Dynamics 365 Business Central** → **Application permissions** → **API.ReadWrite.All** → **Add**. Then **Grant admin consent**.
    - The default **Microsoft Graph → User.Read** (delegated) permission covers portal sign-in; leave it.
+   - Don't add **Microsoft Graph → Mail.Send** here. That would let the app send as *anyone* in your organization. Step [6.3](#63-email) gives it permission to send as the approvals mailbox only.
 
 ---
 
@@ -191,7 +195,7 @@ sudo -u ocr nano config/ocr.env
 | `BC_ENVIRONMENT` | `Production`, or the sandbox name exactly as the BC admin center shows it |
 | `BC_DIM1_CODE`, `BC_DIM2_CODE` | The codes in BC **General Ledger Setup** → **Shortcut Dimension 1 Code** / **2 Code** |
 | `REQAPPROVAL_COMPANY_ID` | See 6.4 |
-| `SMTP_*` | See 6.3 |
+| `MAIL_METHOD`, `MAIL_FROM` | See 6.3 |
 | `OCR_AP_EMAIL`, `OCR_IT_EMAIL` | Optional contacts shown at the bottom of approval emails |
 | `OCR_DELEGATES` | Optional; see [10.3](#103-delegates) |
 | `OCR_SOURCE_URL` | Optional. The portal's **Source code** link. Leave it unless you've changed the code; then point it at your copy (the AGPL license requires this) |
@@ -216,11 +220,70 @@ sudo -u ocr nano config/streamlit/secrets.toml
 
 ### 6.3 Email
 
-The server sends the requisition-approval emails (first and second approver), and an "Approved" email to the BC user who sent a card statement or requisition once it's approved, over SMTP with STARTTLS. The card statement email to the manager goes from BC itself (step 2.4).
+The server sends the requisition-approval emails (first and second approver), and an "Approved" email to the BC user who sent a card statement or requisition once it's approved. The card statement email to the manager goes from BC itself (step 2.4).
 
-- **Microsoft 365:** `SMTP_SERVER=smtp.office365.com`, `SMTP_PORT=587`, `SMTP_USER` = the mailbox address, `SMTP_PASS` = its password. In the Exchange admin center, open the mailbox → **Manage email apps** → turn on **Authenticated SMTP**. The mailbox can't require MFA for this sign-in.
-  Microsoft is retiring password (Basic) authentication for SMTP. It keeps working through December 2026; after that it's turned off by default for existing tenants, and an Exchange admin has to turn it back on. If your tenant has it disabled, use another SMTP provider.
-- **Any other provider** (SendGrid, Amazon SES, your own relay) works if it supports STARTTLS on the port you set and a user name and password.
+#### Microsoft 365 (recommended): Microsoft Graph
+
+The server sends through Microsoft Graph as the Entra app from step 3. There is no mailbox password to store, MFA on the mailbox doesn't matter, and it isn't affected by Microsoft retiring password authentication for SMTP (see below).
+
+In `ocr.env`:
+
+```
+MAIL_METHOD=graph
+MAIL_FROM=approvals@example.com
+```
+
+Then allow the app to send as that one mailbox, using Exchange Online **RBAC for Applications**. You need an Exchange administrator and the [ExchangeOnlineManagement](https://learn.microsoft.com/powershell/exchange/exchange-online-powershell-v2) PowerShell module.
+
+1. In the **Entra admin center** → **Enterprise applications** (not App registrations) → **Card Statement OCR**, copy the **Application ID** and the **Object ID**. The Object ID here is different from the one on the app registration; use this one.
+2. In PowerShell:
+
+   ```powershell
+   Connect-ExchangeOnline
+
+   # tell Exchange about the app (once per tenant)
+   New-ServicePrincipal -AppId <Application ID> -ObjectId <Object ID> -DisplayName "Card Statement OCR"
+
+   # a scope containing only the approvals mailbox
+   New-ManagementScope -Name "Card Statement OCR sender" -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'approvals@example.com'"
+
+   # let the app send as mailboxes in that scope
+   New-ManagementRoleAssignment -App <Object ID> -Role "Application Mail.Send" -CustomResourceScope "Card Statement OCR sender"
+
+   # check: InScope should be True for the approvals mailbox and False for anyone else
+   Test-ServicePrincipalAuthorization -Identity <Object ID> -Resource approvals@example.com | Format-Table
+   Test-ServicePrincipalAuthorization -Identity <Object ID> -Resource someone.else@example.com | Format-Table
+   ```
+
+3. Wait. Exchange can take **30 minutes to 2 hours** to apply the assignment; until then sending fails with `403 ErrorAccessDenied`.
+4. Send a test email (any time after `ocr.env` is filled in):
+
+   ```bash
+   cd /opt/ocr && sudo -u ocr .venv/bin/python -m reqapproval.mailer you@example.com
+   ```
+
+Sent emails are saved in the approvals mailbox's **Sent Items**. Make sure the app does **not** also have the Graph **Mail.Send** application permission in Entra: Entra permissions add to these, so it would be able to send as anyone.
+
+To send from a different Entra app than the BC one, set `MAIL_TENANT_ID`, `MAIL_CLIENT_ID` and `MAIL_CLIENT_SECRET`, and use that app's IDs above.
+
+#### Any other provider: SMTP
+
+SendGrid, Amazon SES or your own relay work if they support STARTTLS and a user name and password: set `MAIL_METHOD=smtp`, `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER` (also the From address) and `SMTP_PASS`.
+
+Don't use SMTP with a Microsoft 365 mailbox. Microsoft is retiring password (Basic) authentication for SMTP AUTH in Exchange Online: at the end of December 2026 it's turned off by default for existing tenants (an Exchange admin can turn it back on for now), new tenants don't get it, and Microsoft will announce a final removal date in the second half of 2027. Use Microsoft Graph above instead.
+
+#### Switching a server from Microsoft 365 SMTP to Graph
+
+If you set a server up with `smtp.office365.com` and a mailbox password:
+
+1. Do the PowerShell steps above for the mailbox that was in `SMTP_USER`.
+2. In `ocr.env`, add `MAIL_METHOD=graph` and `MAIL_FROM=<that mailbox>`, and delete the `SMTP_*` lines.
+3. `sudo systemctl restart ocr-api ocr-portal` and send a test email (step 4 above).
+4. In the Exchange admin center, open the mailbox → **Manage email apps** and turn **Authenticated SMTP** off, and change the mailbox password that was in `ocr.env` (or remove it, for a shared mailbox).
+
+#### Business Central's own email
+
+The card statement email to the manager goes through BC's **Email Accounts** (step 2.4), not this server. If that account uses the **SMTP** connector with a Microsoft 365 password, it's affected by the same retirement: change it to the **Microsoft 365** or **Current User** connector, or switch the SMTP account's authentication to **OAuth 2.0**.
 
 ### 6.4 Company ID and a first connection test
 
@@ -425,7 +488,7 @@ Read the CHANGELOG first. If a release changes the BC contract, update the exten
 
 ### 10.5 Rotating secrets
 
-- **Entra client secret:** create a new one, put it in `ocr.env` and `secrets.toml`, restart both services, then delete the old one.
+- **Entra client secret:** create a new one, put it in `ocr.env` and `secrets.toml`, restart both services, then delete the old one. Approval emails use the same secret (unless you set `MAIL_CLIENT_SECRET`), so they stop too if it expires.
 - **API key:** generate a new one, put it in `ocr.env`, restart, and enter it on **Endpoint API Setup**. Calls fail between those two steps, so do it outside working hours.
 
 ---
@@ -475,7 +538,10 @@ BC attaches the form as `RequisitionForm-<invoice no.>`; the signed copy is adde
 | Submit fails with "'Cost:' not found on the requisition form" (or another label) | That label from [11.3](#113-requisition-form-requirements) isn't on the form as text. Fix the report, delete the blank `RequisitionForm-<no.>` from that invoice, choose **Attach As PDF** to print a new one, then have the manager submit again (nothing already added is added twice). |
 | No signed form after Submit | The blank `RequisitionForm-<no.>` wasn't on the invoice when the manager submitted, so signing was skipped (see the `ocr-portal` log). Check **Requisition Form Report ID**. |
 | Sign-in error AADSTS50011 (redirect URI mismatch) | On the portal: the Entra redirect URI and `redirect_uri` in `secrets.toml` must match exactly, including any port. On BC's **Grant Consent** (the error names `businesscentral.dynamics.com/OAuthLanding.htm`): add that URI to the app's **Authentication** page (step 3). |
-| Approval email fails with an authentication error | Authenticated SMTP is off for the mailbox, the password changed, MFA is enforced, or Basic auth for SMTP is disabled in your tenant (6.3). |
+| Approval email fails with `403 ErrorAccessDenied` | The app isn't allowed to send as `MAIL_FROM` yet. Check `Test-ServicePrincipalAuthorization` (6.3); if it says InScope True, wait up to 2 hours for Exchange to apply it. |
+| Approval email fails with `404` / `ErrorInvalidUser` | `MAIL_FROM` isn't a mailbox in this tenant. |
+| "Could not get a Microsoft Graph token" | The client secret expired or is wrong (10.5). |
+| Approval email fails with an SMTP authentication error | Only with `MAIL_METHOD=smtp`: the password is wrong, or it's a Microsoft 365 mailbox with password SMTP turned off. For Microsoft 365, use `MAIL_METHOD=graph` (6.3). |
 | Card statement email not sent | BC's default **Email Account** isn't set up; the error in BC includes the portal link so you can send it by hand. |
 | First statement takes minutes | docTR is downloading its models; later runs are faster. BC waits up to 5 minutes. |
 | Portal shows nothing for a manager | They must sign in with the same email as on **Requisition Managers** (or be set up as a delegate). |

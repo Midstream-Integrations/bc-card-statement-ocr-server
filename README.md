@@ -39,7 +39,7 @@ Business Central (bc-card-statement-ocr)          this server
 The full walk-through, covering the server, Microsoft Entra, Business Central and email, is in **[docs/INSTALL.md](docs/INSTALL.md)**. In short:
 
 1. Install the [bc-card-statement-ocr](https://github.com/Midstream-Integrations/bc-card-statement-ocr) extension in Business Central.
-2. Register one Entra app (BC API access + portal sign-in) and add it to BC's **Microsoft Entra Applications** page.
+2. Register one Entra app (BC API access, portal sign-in, and sending approval emails through Microsoft Graph) and add it to BC's **Microsoft Entra Applications** page. An Exchange admin lets it send as your approvals mailbox only.
 3. On an Ubuntu 24.04 or Debian 13 server: Python 3.12 venv, `pip install -r requirements.txt`, fill in `config/ocr.env` and `config/streamlit/secrets.toml`.
 4. Start the two systemd services behind nginx with a TLS certificate. Optionally, limit `/api/` to Business Central's addresses.
 5. In BC, fill in **Endpoint API Setup** and press **Test OCR Connection**.
@@ -51,6 +51,7 @@ The full walk-through, covering the server, Microsoft Entra, Business Central an
 | Runtime | Python 3.12, FastAPI, Streamlit, docTR (CPU), PyMuPDF |
 | Server size | 2 vCPU, 4 GB RAM to start; receipt checking (`OCR_READ_RECEIPTS`) needs more |
 | Storage | SQLite + files in `OCR_DATA_DIR` |
+| Email | Microsoft Graph `sendMail` as the Entra app, scoped to one mailbox (no mailbox password); SMTP for non-Microsoft providers |
 | BC API used | Standard API v2.0 plus `/api/midstream/RequisitionApprovalInvoices/v1.0` from the extension |
 | Card issuers | Huntington Business Card, U.S. Bank Business Card; detected automatically from the PDF (add more in `cards/parsers.py`) |
 | G/L format | `xxxxx-yy-zzzz` (account, dimension 1, dimension 2); see INSTALL for changing it |
