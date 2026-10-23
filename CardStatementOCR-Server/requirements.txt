@@ -1,0 +1,13 @@
+# Python 3.12 venv. Install the CPU build of torch first:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+python-doctr==1.1.0
+streamlit==1.65.0
+authlib==1.8.0           # st.login (Microsoft Entra sign-in)
+pdfplumber==0.11.10
+pandas>=2.2
+pillow-heif==1.8.0       # iPhone HEIC receipt photos
+fastapi==0.142.2
+uvicorn==0.54.0
+pydantic[email]>=2.7
+requests>=2.32
+pymupdf>=1.24            # stamps the Requisition Form

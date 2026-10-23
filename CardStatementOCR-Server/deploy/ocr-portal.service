@@ -1,0 +1,13 @@
+[Unit]
+Description=OCR portal (Streamlit)
+After=network.target
+
+[Service]
+User=ocr
+WorkingDirectory=/opt/ocr
+EnvironmentFile=/opt/ocr/config/ocr.env
+ExecStart=/opt/ocr/.venv/bin/streamlit run portal.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

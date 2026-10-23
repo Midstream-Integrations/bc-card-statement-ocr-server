@@ -1,0 +1,13 @@
+# secrets and per-server config
+CardStatementOCR-Server/config/ocr.env
+CardStatementOCR-Server/config/streamlit/secrets.toml
+# Python
+.venv/
+__pycache__/
+*.pyc
+# local data (when OCR_DATA_DIR points inside the repo)
+*.db
+statements/
+receipts/
+*.bak
+.DS_Store

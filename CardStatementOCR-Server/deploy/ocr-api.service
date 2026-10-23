@@ -1,0 +1,13 @@
+[Unit]
+Description=OCR API (BC-facing)
+After=network.target
+
+[Service]
+User=ocr
+WorkingDirectory=/opt/ocr
+EnvironmentFile=/opt/ocr/config/ocr.env
+ExecStart=/opt/ocr/.venv/bin/uvicorn api:app --host 127.0.0.1 --port 8010 --proxy-headers
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

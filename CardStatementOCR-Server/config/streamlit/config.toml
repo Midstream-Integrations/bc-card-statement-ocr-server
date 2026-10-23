@@ -1,0 +1,8 @@
+[server]
+address = "127.0.0.1"      # nginx terminates TLS and proxies here
+port = 8501
+headless = true
+maxUploadSize = 25         # MB, per receipt
+
+[browser]
+gatherUsageStats = false
