@@ -7,6 +7,8 @@
 <!-- DEMO: record a 30-60 second screen capture, save it as docs/images/demo.gif, then replace this comment with:
 ![Demo](docs/images/demo.gif) -->
 
+> **Free and open source.** Want it installed, hosted or changed to fit your process? [Midstream Integrations](https://www.MidstreamIntegrations.com) does that. [Book a 20-minute call](https://midstreamintegrations.com/contact).
+
 ## What it does
 
 - **Reads the statement.** BC uploads a card statement PDF; the server pulls out every cardholder and charge. Scanned statements are read with docTR, on the server itself.
@@ -56,9 +58,15 @@ The full walk-through, covering the server, Microsoft Entra, Business Central an
 | Card issuers | Huntington Business Card, U.S. Bank Business Card; detected automatically from the PDF (add more in `cards/parsers.py`) |
 | G/L format | `xxxxx-yy-zzzz` (account, dimension 1, dimension 2); see INSTALL for changing it |
 
-## Need help with this?
+## Need help, or something this doesn't do?
 
-[Midstream Integrations](https://www.MidstreamIntegrations.com) hosts this server for you, installs and configures it, adds parsers for your card issuer, and supports it.
+[Midstream Integrations](https://www.MidstreamIntegrations.com) builds and supports Business Central integrations. We can:
+
+- host and maintain this server for you, one private instance per customer, so there's nothing for you to run
+- add a parser for your card issuer
+- change the G/L format, the portal or the approval rules to fit your process
+- build other integrations between Business Central and the systems you run
+
 **[Book a 20-minute call](https://midstreamintegrations.com/contact)** · intro@MidstreamIntegrations.com
 
 ## Contributing
@@ -70,6 +78,6 @@ Found a security problem? Please follow the [security policy](https://github.com
 
 [GNU Affero General Public License v3.0](LICENSE) © Midstream Integrations
 
-You can use, change and self-host this server for free. If you change it and let other people use it over a network (for example, hosting it for a client), you must offer those people your changed source code under the same license; set `OCR_SOURCE_URL` so the portal's **Source code** link points to it. If that doesn't work for your business, [contact us](https://www.MidstreamIntegrations.com) about a commercial license.
+You can use, change and self-host this server for free. If you change it and let other people use it over a network (for example, hosting it for a client), you must offer those people your changed source code under the same license; set `OCR_SOURCE_URL` so the portal's **Source code** link points to it. If that doesn't work for your business, [contact us](https://midstreamintegrations.com/contact) about a commercial license.
 
 The Business Central extension in [bc-card-statement-ocr](https://github.com/Midstream-Integrations/bc-card-statement-ocr) is MIT licensed.
